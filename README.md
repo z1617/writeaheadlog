@@ -1,7 +1,7 @@
 # A general purpose, high performance write-ahead-log
 
 A write-ahead-log (WAL) ensures durability and atomicity for updating data on
-disk if used correctly. Instructions are marshalled and passed to the WAL
+disk if used correctly. Instructions are marshaled and passed to the WAL
 before they are applied to disk. The WAL makes sure that the instructions are
 synced to the WAL file before the user applies them. That way the wal can
 notify the user about unfinished updates due to a sudden power outage. It is up
@@ -64,7 +64,7 @@ if err != nil {
 ```
 
 This will write the updates to disk and commit them. The caller needs to wait
-on the returned channel to ensure a successfull commit. After the commit it is
+on the returned channel to ensure a successful commit. After the commit it is
 safe for the caller to apply the updates to disk and once finished, signal the
 wal that it can now mark the transaction as applied and recycle the
 transaction.
