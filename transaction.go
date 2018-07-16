@@ -122,14 +122,14 @@ func (t Transaction) checksum() (c checksum) {
 	// write the transaction metadata
 	binary.LittleEndian.PutUint64(buf[:], t.status)
 	binary.LittleEndian.PutUint64(buf[8:], t.sequenceNumber)
-	h.Write(buf[:16])
+	_, _ = h.Write(buf[:16])
 	// write pages
 	for page := t.firstPage; page != nil; page = page.nextPage {
 		for i := range buf {
 			buf[i] = 0
 		}
 		page.appendTo(buf[:0])
-		h.Write(buf)
+		_, _ = h.Write(buf)
 	}
 	copy(c[:], h.Sum(buf[:0]))
 	return
