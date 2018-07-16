@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"unsafe"
 
-	"github.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // WAL is a general purpose, high performance write-ahead-log for performing

@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/errors"
-	"github.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/fastrand"
 	"golang.org/x/crypto/blake2b"
 )
 

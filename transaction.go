@@ -7,7 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/errors"
 	"golang.org/x/crypto/blake2b"
 )
 

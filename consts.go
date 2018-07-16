@@ -48,7 +48,7 @@ const (
 )
 
 var (
-	// "github.com/NebulousLabs/writeaheadlog\n"
+	// "gitlab.com/NebulousLabs/writeaheadlog\n"
 	metadataHeader = [38]byte{'g', 'i', 't', 'h', 'u', 'b', '.', 'c', 'o', 'm', '/',
 		'N', 'e', 'b', 'u', 'l', 'o', 'u', 's', 'L', 'a', 'b', 's', '/',
 		'w', 'r', 'i', 't', 'e', 'a', 'h', 'e', 'a', 'd', 'l', 'o', 'g', '\n'}

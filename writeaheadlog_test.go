@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 // retry will call 'fn' 'tries' times, waiting 'durationBetweenAttempts'
