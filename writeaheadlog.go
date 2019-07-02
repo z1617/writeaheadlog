@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"unsafe"
 
+	"gitlab.com/NebulousLabs/Sia/persist"
+
 	"gitlab.com/NebulousLabs/errors"
 )
 
@@ -51,10 +53,11 @@ type WAL struct {
 	// dependencies are used to inject special behaviour into the wal by providing
 	// custom dependencies when the wal is created and calling deps.disrupt(setting).
 	// The following settings are currently available
-	deps    dependencies
-	logFile file
-	mu      sync.Mutex
-	path    string // path of the underlying logFile
+	deps      dependencies
+	logFile   file
+	mu        sync.Mutex
+	path      string // path of the underlying logFile
+	staticLog *persist.Logger
 }
 
 // allocatePages creates new pages and adds them to the available pages of the wal
@@ -68,11 +71,12 @@ func (w *WAL) allocatePages(numPages uint64) {
 }
 
 // newWal initializes and returns a wal.
-func newWal(path string, deps dependencies) (txns []*Transaction, w *WAL, err error) {
+func newWal(path string, deps dependencies, log *persist.Logger) (txns []*Transaction, w *WAL, err error) {
 	// Create a new WAL.
 	newWal := &WAL{
-		deps: deps,
-		path: path,
+		deps:      deps,
+		path:      path,
+		staticLog: log,
 	}
 	// sync.go expects the sync state to be initialized with a locked rwMu at
 	// startup.
@@ -381,7 +385,7 @@ func (w *WAL) CloseIncomplete() (int64, error) {
 // simulating multiple consecutive unclean shutdowns. If the updates are
 // properly idempotent, there should be no functional difference between the
 // multiple appearances and them just being loaded a single time correctly.
-func New(path string) ([]*Transaction, *WAL, error) {
+func New(path string, log *persist.Logger) ([]*Transaction, *WAL, error) {
 	// Create a wal with production dependencies
-	return newWal(path, &dependencyProduction{})
+	return newWal(path, &dependencyProduction{}, log)
 }
