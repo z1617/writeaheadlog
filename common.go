@@ -66,10 +66,10 @@ func ApplyWriteAtUpdate(u Update) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	// Write data to file.
-	_, err = f.WriteAt(data, index)
-	return err
+	_, errWrite := f.WriteAt(data, index)
+	errClose := f.Close()
+	return errors.Compose(errWrite, errClose)
 }
 
 // DeleteUpdate creates an update that deletes the file at the specified path.
