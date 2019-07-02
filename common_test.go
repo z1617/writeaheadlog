@@ -64,4 +64,17 @@ func TestCommon(t *testing.T) {
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		t.Fatal("file should've been deleted")
 	}
+	// Create a folder to remove.
+	dir := filepath.Join(testDir, "folder")
+	if err := os.Mkdir(dir, 0777); err != nil {
+		t.Fatal(err)
+	}
+	update = DeleteUpdate(dir)
+	err = wal.CreateAndApplyTransaction(ApplyUpdates, update)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
 }

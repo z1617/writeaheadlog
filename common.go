@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	// NameDeleteUpdate is the name of an idempotent update that deletes a file
-	// from a given path on disk.
+	// NameDeleteUpdate is the name of an idempotent update that deletes a file or
+	// folder from a given path on disk.
 	NameDeleteUpdate = "DELETE"
 	// NameTruncateUpdate is the name of an idempotent update that truncates a file
 	// to have a certain size.
@@ -25,11 +25,8 @@ func ApplyDeleteUpdate(u Update) error {
 	if u.Name != NameDeleteUpdate {
 		return fmt.Errorf("applyDeleteUpdate called on update of type %v", u.Name)
 	}
-	// Remove file if it hasn't been removed already.
-	if err := os.Remove(string(u.Instructions)); !os.IsNotExist(err) {
-		return err
-	}
-	return nil
+	// Remove file/folder.
+	return os.RemoveAll(string(u.Instructions))
 }
 
 // ApplyTruncateUpdate parses and applies a truncate update.
