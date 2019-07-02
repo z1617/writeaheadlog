@@ -1,4 +1,5 @@
 deps:
+	go get -u gitlab.com/NebulousLabs/Sia/encoding
 	go get -u gitlab.com/NebulousLabs/errors
 	go get -u gitlab.com/NebulousLabs/fastrand
 	go get -u golang.org/x/crypto/blake2b
