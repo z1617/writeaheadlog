@@ -19,7 +19,7 @@ func newTestWAL(path string, deps dependencies) ([]*Transaction, *WAL, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return New(path, log)
+	return newWal(path, deps, log)
 }
 
 // newProdTestWAL is the same as newTestWAL but with production dependencies.
