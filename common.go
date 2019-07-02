@@ -100,6 +100,8 @@ func ApplyUpdates(updates ...Update) error {
 		switch update.Name {
 		case NameDeleteUpdate:
 			err = ApplyDeleteUpdate(update)
+		case NameTruncateUpdate:
+			err = ApplyTruncateUpdate(update)
 		case NameWriteAtUpdate:
 			err = ApplyWriteAtUpdate(update)
 		default:
