@@ -348,7 +348,7 @@ func (t *Transaction) SignalUpdatesApplied() error {
 	if atomic.AddInt64(&t.wal.atomicUnfinishedTxns, -1) < 0 {
 		panic("Sanity check failed. atomicUnfinishedTxns should never be negative")
 	}
-	t.wal.staticLog.Debugf("SignalUpdatesAppliece on txn with %v updates", len(t.Updates))
+	t.wal.staticLog.Debugf("SignalUpdatesApplied on txn with %v updates", len(t.Updates))
 	for i, u := range t.Updates {
 		t.wal.staticLog.Debugf(" %v: %v - %v", i+1, u.Name, u.Instructions)
 	}
