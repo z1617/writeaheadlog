@@ -350,7 +350,7 @@ func (t *Transaction) SignalUpdatesApplied() error {
 	}
 	t.wal.staticLog.Debugf("SignalUpdatesApplied on txn with %v updates", len(t.Updates))
 	for i, u := range t.Updates {
-		t.wal.staticLog.Debugf(" %v: %v - %v", i+1, u.Name, u.Instructions)
+		t.wal.staticLog.Debugf("\tupdate %i: %s", i, u.Name)
 	}
 	t.wal.staticLog.Debugf("UnfinishedTxns: %v", atomic.LoadInt64(&t.wal.atomicUnfinishedTxns))
 
@@ -527,7 +527,7 @@ func (w *WAL) NewTransaction(updates []Update) (*Transaction, error) {
 	// Increase the number of active transaction
 	w.staticLog.Debugf("Creating new txn with %v updates", len(updates))
 	for i, u := range updates {
-		w.staticLog.Debugf("  %v: '%v' - '%v'", i+1, u.Name, u.Instructions)
+		w.staticLog.Debugf("\tupdate %i: %s", i, u.Name)
 	}
 	atomic.AddInt64(&w.atomicUnfinishedTxns, 1)
 	w.staticLog.Debugf("UnfinishedTxns: %v", atomic.LoadInt64(&w.atomicUnfinishedTxns))
