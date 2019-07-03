@@ -259,6 +259,10 @@ nextTxn:
 			continue
 		}
 		txn.Updates = updates
+		w.staticLog.Println("wal has recovered an unfinished transaction")
+		for i, update := range updates {
+			w.staticLog.Printf("\tupdate %i: %s", i, update.Name)
+		}
 
 		txns = append(txns, txn)
 	}
