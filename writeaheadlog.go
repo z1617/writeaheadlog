@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sort"
 	"sync"
@@ -18,47 +19,57 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
-// WAL is a general purpose, high performance write-ahead-log for performing
-// ACID transactions to disk without sacrificing speed or latency more than
-// fundamentally required.
-type WAL struct {
-	// atomicNextTxnNum is used to give every transaction a unique transaction
-	// number. The transaction will then wait until atomicTransactionCounter allows
-	// the transaction to be committed. This ensures that transactions are committed
-	// in the correct order.
-	atomicNextTxnNum uint64
+type (
+	// WAL is a general purpose, high performance write-ahead-log for performing
+	// ACID transactions to disk without sacrificing speed or latency more than
+	// fundamentally required.
+	WAL struct {
+		// atomicNextTxnNum is used to give every transaction a unique transaction
+		// number. The transaction will then wait until atomicTransactionCounter allows
+		// the transaction to be committed. This ensures that transactions are committed
+		// in the correct order.
+		atomicNextTxnNum uint64
 
-	// atomicUnfinishedTxns counts how many transactions were created but not
-	// released yet. This counter needs to be 0 for the wal to exit cleanly.
-	atomicUnfinishedTxns int64
+		// atomicUnfinishedTxns counts how many transactions were created but not
+		// released yet. This counter needs to be 0 for the wal to exit cleanly.
+		atomicUnfinishedTxns int64
 
-	// Variables to coordinate batched syncs. See sync.go for more information.
-	atomicSyncStatus uint32         // 0: no syncing thread, 1: syncing thread, empty queue, 2: syncing thread, non-empty queue.
-	atomicSyncState  unsafe.Pointer // points to a struct containing a RWMutex and an error
+		// Variables to coordinate batched syncs. See sync.go for more information.
+		atomicSyncStatus uint32         // 0: no syncing thread, 1: syncing thread, empty queue, 2: syncing thread, non-empty queue.
+		atomicSyncState  unsafe.Pointer // points to a struct containing a RWMutex and an error
 
-	// availablePages lists the offset of file pages which currently have completed or
-	// voided updates in them. The pages are in no particular order.
-	availablePages []uint64
+		// availablePages lists the offset of file pages which currently have completed or
+		// voided updates in them. The pages are in no particular order.
+		availablePages []uint64
 
-	// filePageCount indicates the number of pages total in the file. If the
-	// number of availablePages ever drops below the number of pages required
-	// for a new transaction, then the file is extended, new pages are added,
-	// and the availablePages array is updated to include the extended pages.
-	filePageCount uint64
+		// filePageCount indicates the number of pages total in the file. If the
+		// number of availablePages ever drops below the number of pages required
+		// for a new transaction, then the file is extended, new pages are added,
+		// and the availablePages array is updated to include the extended pages.
+		filePageCount uint64
 
-	// wg is a WaitGroup that allows us to wait for the syncThread to finish to
-	// ensure a clean shutdown
-	wg sync.WaitGroup
+		// wg is a WaitGroup that allows us to wait for the syncThread to finish to
+		// ensure a clean shutdown
+		wg sync.WaitGroup
 
-	// dependencies are used to inject special behaviour into the wal by providing
-	// custom dependencies when the wal is created and calling deps.disrupt(setting).
-	// The following settings are currently available
-	deps      dependencies
-	logFile   file
-	mu        sync.Mutex
-	path      string // path of the underlying logFile
-	staticLog *persist.Logger
-}
+		// dependencies are used to inject special behaviour into the wal by providing
+		// custom dependencies when the wal is created and calling deps.disrupt(setting).
+		// The following settings are currently available
+		deps      dependencies
+		logFile   file
+		mu        sync.Mutex
+		path      string // path of the underlying logFile
+		staticLog *persist.Logger
+	}
+
+	// Options are a helper struct for creating a WAL. This allows for the API of
+	// the writeaheadlog to remain compatible by simply extending the Options
+	// struct with new fields as needed.
+	Options struct {
+		deps   dependencies
+		Logger *persist.Logger
+	}
+)
 
 // allocatePages creates new pages and adds them to the available pages of the wal
 func (w *WAL) allocatePages(numPages uint64) {
@@ -71,12 +82,19 @@ func (w *WAL) allocatePages(numPages uint64) {
 }
 
 // newWal initializes and returns a wal.
-func newWal(path string, deps dependencies, log *persist.Logger) (txns []*Transaction, w *WAL, err error) {
+func newWal(path string, options Options) (txns []*Transaction, w *WAL, err error) {
+	// Check for default options.
+	if options.deps == nil {
+		options.deps = &dependencyProduction{}
+	}
+	if options.Logger == nil {
+		options.Logger = persist.NewLogger(ioutil.Discard)
+	}
 	// Create a new WAL.
 	newWal := &WAL{
-		deps:      deps,
+		deps:      options.deps,
 		path:      path,
-		staticLog: log,
+		staticLog: options.Logger,
 	}
 	// sync.go expects the sync state to be initialized with a locked rwMu at
 	// startup.
@@ -86,10 +104,10 @@ func newWal(path string, deps dependencies, log *persist.Logger) (txns []*Transa
 
 	// Create a condition for the wal
 	// Try opening the WAL file.
-	data, err := deps.readFile(path)
+	data, err := newWal.deps.readFile(path)
 	if err == nil {
 		// Reuse the existing wal
-		newWal.logFile, err = deps.openFile(path, os.O_RDWR, 0600)
+		newWal.logFile, err = newWal.deps.openFile(path, os.O_RDWR, 0600)
 		if err != nil {
 			return nil, nil, errors.Extend(errors.New("unable to open wal logFile"), err)
 		}
@@ -109,7 +127,7 @@ func newWal(path string, deps dependencies, log *persist.Logger) (txns []*Transa
 	}
 
 	// Create new empty WAL
-	newWal.logFile, err = deps.create(path)
+	newWal.logFile, err = newWal.deps.create(path)
 	if err != nil {
 		return nil, nil, errors.Extend(err, errors.New("walFile could not be created"))
 	}
@@ -385,7 +403,13 @@ func (w *WAL) CloseIncomplete() (int64, error) {
 // simulating multiple consecutive unclean shutdowns. If the updates are
 // properly idempotent, there should be no functional difference between the
 // multiple appearances and them just being loaded a single time correctly.
-func New(path string, log *persist.Logger) ([]*Transaction, *WAL, error) {
-	// Create a wal with production dependencies
-	return newWal(path, &dependencyProduction{}, log)
+func New(path string) ([]*Transaction, *WAL, error) {
+	// Create a wal with default options.
+	return newWal(path, Options{})
+}
+
+// NewWithOptions opens a WAL like New but takes an Options struct as an
+// additional argument to customize some of the WAL's behavior like logging.
+func NewWithOptions(path string, opts Options) ([]*Transaction, *WAL, error) {
+	return newWal(path, opts)
 }
