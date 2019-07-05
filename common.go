@@ -35,6 +35,9 @@ func ApplyTruncateUpdate(u Update) error {
 		return fmt.Errorf("applyTruncateUpdate called on update of type %v", u.Name)
 	}
 	// Decode update.
+	if len(u.Instructions) < 8 {
+		return errors.New("instructions slice of update is too short to contain the size and path")
+	}
 	size := int64(binary.LittleEndian.Uint64(u.Instructions[:8]))
 	path := string(u.Instructions[8:])
 	// Truncate file.
@@ -47,8 +50,14 @@ func ApplyWriteAtUpdate(u Update) error {
 		return fmt.Errorf("applyWriteAtUpdate called on update of type %v", u.Name)
 	}
 	// Decode update.
+	if len(u.Instructions) < 12 {
+		return errors.New("instructions slice of update is too short to contain the index and path prefix")
+	}
 	index := int64(binary.LittleEndian.Uint64(u.Instructions[:8]))
 	pathPrefix := binary.LittleEndian.Uint32(u.Instructions[8:12])
+	if uint32(len(u.Instructions)) < 12+pathPrefix {
+		return errors.New("instructions slice is too small to hold the path")
+	}
 	path := string(u.Instructions[12 : 12+pathPrefix])
 	data := u.Instructions[12+pathPrefix:]
 	// Open file.
