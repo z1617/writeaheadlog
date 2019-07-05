@@ -2,6 +2,7 @@ package writeaheadlog
 
 import (
 	"bytes"
+	"encoding/hex"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,10 +14,15 @@ import (
 // TestCommon tests the methods of common.go.
 func TestCommon(t *testing.T) {
 	// Create testing environment.
-	testDir := tempDir(t.Name())
+	folders := []string{t.Name()}
+	for i := 0; i < fastrand.Intn(10); i++ {
+		folders = append(folders, hex.EncodeToString(fastrand.Bytes(16)))
+	}
+	testDir := tempDir(folders...)
 	if err := os.MkdirAll(testDir, 0777); err != nil {
 		t.Fatal(err)
 	}
+	defer os.RemoveAll(testDir)
 	path := filepath.Join(testDir, "test.file")
 	txns, wal, err := New(filepath.Join(testDir, "test.wal"))
 	if err != nil {
@@ -26,12 +32,15 @@ func TestCommon(t *testing.T) {
 		t.Fatal("wal wasn't empty")
 	}
 	// Create a file using an update.
-	data := fastrand.Bytes(100)
-	update := WriteAtUpdate(path, 0, data)
+	data := fastrand.Bytes(fastrand.Intn(100) + 100)
+	offset := int64(fastrand.Intn(10))
+	update := WriteAtUpdate(path, offset, data)
 	err = wal.CreateAndApplyTransaction(ApplyUpdates, update)
 	if err != nil {
 		t.Fatal(err)
 	}
+	// If the offset wasn't 0 we need to prepend 0 bytes to the expected data.
+	data = append(make([]byte, offset), data...)
 	// Make sure the file was created.
 	readData, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -40,8 +49,9 @@ func TestCommon(t *testing.T) {
 	if !bytes.Equal(data, readData) {
 		t.Fatal("Data on disk doesn't match written data")
 	}
-	// Truncate the file to half of its size.
-	update = TruncateUpdate(path, int64(len(data)/2))
+	// Truncate the file.
+	newSize := fastrand.Intn(len(data)) + 1
+	update = TruncateUpdate(path, int64(newSize))
 	err = wal.CreateAndApplyTransaction(ApplyUpdates, update)
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +61,7 @@ func TestCommon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(data[:len(data)/2], readData) {
+	if !bytes.Equal(data[:newSize], readData) {
 		t.Fatal("Data on disk doesn't match written data")
 	}
 	// Delete the file.

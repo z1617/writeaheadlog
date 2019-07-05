@@ -114,7 +114,8 @@ func WriteAtUpdate(path string, index int64, data []byte) Update {
 	i := make([]byte, 8+4+len(path)+len(data))
 	binary.LittleEndian.PutUint64(i[:8], uint64(index))
 	binary.LittleEndian.PutUint32(i[8:12], uint32(len(path)))
-	copy(i[12:], data)
+	copy(i[12:12+len(path)], path)
+	copy(i[12+len(path):], data)
 	return Update{
 		Name:         NameWriteAtUpdate,
 		Instructions: i,
