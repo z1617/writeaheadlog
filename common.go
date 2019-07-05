@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	// NameDeleteUpdate is the name of an idempotent update that deletes a file
-	// from a given path on disk.
+	// NameDeleteUpdate is the name of an idempotent update that deletes a file or
+	// folder from a given path on disk.
 	NameDeleteUpdate = "DELETE"
 	// NameTruncateUpdate is the name of an idempotent update that truncates a file
 	// to have a certain size.
@@ -25,11 +25,8 @@ func ApplyDeleteUpdate(u Update) error {
 	if u.Name != NameDeleteUpdate {
 		return fmt.Errorf("applyDeleteUpdate called on update of type %v", u.Name)
 	}
-	// Remove file if it hasn't been removed already.
-	if err := os.Remove(string(u.Instructions)); !os.IsNotExist(err) {
-		return err
-	}
-	return nil
+	// Remove file/folder.
+	return os.RemoveAll(string(u.Instructions))
 }
 
 // ApplyTruncateUpdate parses and applies a truncate update.
@@ -59,10 +56,10 @@ func ApplyWriteAtUpdate(u Update) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	// Write data to file.
-	_, err = f.WriteAt(data, index)
-	return err
+	_, errWrite := f.WriteAt(data, index)
+	errClose := f.Close()
+	return errors.Compose(errWrite, errClose)
 }
 
 // DeleteUpdate creates an update that deletes the file at the specified path.
@@ -96,6 +93,8 @@ func ApplyUpdates(updates ...Update) error {
 		switch update.Name {
 		case NameDeleteUpdate:
 			err = ApplyDeleteUpdate(update)
+		case NameTruncateUpdate:
+			err = ApplyTruncateUpdate(update)
 		case NameWriteAtUpdate:
 			err = ApplyWriteAtUpdate(update)
 		default:
@@ -143,5 +142,4 @@ func (w *WAL) CreateAndApplyTransaction(applyFunc func(...Update) error, updates
 		return errors.AddContext(err, "failed to signal that updates are applied")
 	}
 	return nil
-
 }
