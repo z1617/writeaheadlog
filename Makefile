@@ -1,5 +1,4 @@
 deps:
-	go get -u gitlab.com/NebulousLabs/Sia/encoding
 	go get -u gitlab.com/NebulousLabs/errors
 	go get -u gitlab.com/NebulousLabs/Sia/persist
 	go get -u gitlab.com/NebulousLabs/fastrand
