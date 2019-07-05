@@ -348,6 +348,11 @@ func (t *Transaction) SignalUpdatesApplied() error {
 	if atomic.AddInt64(&t.wal.atomicUnfinishedTxns, -1) < 0 {
 		panic("Sanity check failed. atomicUnfinishedTxns should never be negative")
 	}
+	t.wal.staticLog.Debugf("SignalUpdatesApplied on txn with %v updates", len(t.Updates))
+	for i, u := range t.Updates {
+		t.wal.staticLog.Debugf("\tupdate %d: %s", i, u.Name)
+	}
+	t.wal.staticLog.Debugf("UnfinishedTxns: %v", atomic.LoadInt64(&t.wal.atomicUnfinishedTxns))
 
 	return nil
 }
@@ -503,12 +508,12 @@ func (w *WAL) NewTransaction(updates []Update) (*Transaction, error) {
 	if len(updates) == 0 {
 		return nil, errors.New("cannot create a transaction without updates")
 	}
-	// Verify the updates
+	// Verify the updates.
 	for _, u := range updates {
 		u.verify()
 	}
 
-	// Create new transaction
+	// Create new transaction.
 	txn := &Transaction{
 		Updates:      updates,
 		wal:          w,
@@ -520,7 +525,12 @@ func (w *WAL) NewTransaction(updates []Update) (*Transaction, error) {
 	go threadedInitTransaction(txn)
 
 	// Increase the number of active transaction
+	w.staticLog.Debugf("Creating new txn with %v updates", len(updates))
+	for i, u := range updates {
+		w.staticLog.Debugf("\tupdate %d: %s", i, u.Name)
+	}
 	atomic.AddInt64(&w.atomicUnfinishedTxns, 1)
+	w.staticLog.Debugf("UnfinishedTxns: %v", atomic.LoadInt64(&w.atomicUnfinishedTxns))
 
 	return txn, nil
 }

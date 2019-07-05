@@ -384,7 +384,7 @@ func verifyNumbers(numbers []uint32) error {
 // repeatedly until it finishes.
 func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]*silo, testdir string, file file, numSilos int64, numIncrease int) (numSkipped int64, err error) {
 	// Reload wal.
-	recoveredTxns, wal, err := newWal(walPath, deps)
+	recoveredTxns, wal, err := newTestWAL(walPath, deps)
 	if err != nil {
 		return 0, errors.Extend(errors.New("failed to reload WAL"), err)
 	}
@@ -480,7 +480,7 @@ func newSiloDatabase(deps *dependencyFaultyDisk, dbPath, walPath string, dataPat
 		return nil, nil, nil, err
 	}
 	// Create the wal.
-	recoveredTxns, wal, err := newWal(walPath, deps)
+	recoveredTxns, wal, err := newTestWAL(walPath, deps)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -570,7 +570,7 @@ func TestSilo(t *testing.T) {
 		} else {
 			// Resume with existing database.
 			var recoveredTxns []*Transaction
-			recoveredTxns, wal, err = newWal(walPath, deps)
+			recoveredTxns, wal, err = newTestWAL(walPath, deps)
 			if int64(len(recoveredTxns)) != numSkipped || err != nil {
 				t.Fatal(recoveredTxns, err)
 			}

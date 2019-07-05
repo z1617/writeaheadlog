@@ -9,8 +9,26 @@ import (
 	"testing"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia/persist"
 	"gitlab.com/NebulousLabs/fastrand"
 )
+
+// newTestWAL creates a new WAL with a logger for testing.
+func newTestWAL(path string, deps dependencies) ([]*Transaction, *WAL, error) {
+	log, err := persist.NewFileLogger(filepath.Join(filepath.Dir(path), "wal.log"))
+	if err != nil {
+		return nil, nil, err
+	}
+	return newWal(path, Options{
+		deps:   deps,
+		Logger: log,
+	})
+}
+
+// newProdTestWAL is the same as newTestWAL but with production dependencies.
+func newProdTestWAL(path string) ([]*Transaction, *WAL, error) {
+	return newTestWAL(path, &dependencyProduction{})
+}
 
 // retry will call 'fn' 'tries' times, waiting 'durationBetweenAttempts'
 // between each attempt, returning 'nil' the first time that 'fn' returns nil.
@@ -61,7 +79,7 @@ func newWALTester(name string, deps dependencies) (*walTester, error) {
 	}
 
 	path := filepath.Join(testdir, "test.wal")
-	recoveredTxns, wal, err := newWal(path, deps)
+	recoveredTxns, wal, err := newTestWAL(path, deps)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +146,7 @@ func TestCommitFailed(t *testing.T) {
 
 	// Restart it. No unfinished updates should be reported since they were
 	// never committed
-	updates2, w, err := New(wt.path)
+	updates2, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +240,7 @@ func TestReleaseFailed(t *testing.T) {
 
 	// Restart it. There should be 1 unfinished update since it was committed
 	// but never released
-	updates2, w, err := New(wt.path)
+	updates2, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +299,7 @@ func TestReleaseNotCalled(t *testing.T) {
 	}
 
 	// Restart it and check if exactly 1 unfinished transaction is reported
-	updates2, w, err := New(wt.path)
+	updates2, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -346,7 +364,7 @@ func TestPayloadCorrupted(t *testing.T) {
 	}
 
 	// Restart it. 1 unfinished transaction should be reported
-	updates2, w, err := New(wt.path)
+	updates2, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -410,7 +428,7 @@ func TestPayloadCorrupted2(t *testing.T) {
 	}
 
 	// Restart it. 1 Unfinished transaction should be reported.
-	updates2, w, err := New(wt.path)
+	updates2, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -491,7 +509,7 @@ func TestWalParallel(t *testing.T) {
 	t.Logf("used pages: %v", wt.wal.filePageCount)
 
 	// Restart it and check that no unfinished transactions are reported
-	updates2, w, err := New(wt.path)
+	updates2, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Error(err)
 	}
@@ -716,7 +734,7 @@ func TestRecoveryFailed(t *testing.T) {
 		t.Error("There should have been an error but there wasn't")
 	}
 
-	recoveredTxns2, w, err := newWal(wt.path, &dependencyRecoveryFail{})
+	recoveredTxns2, w, err := newTestWAL(wt.path, &dependencyRecoveryFail{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -741,7 +759,7 @@ func TestRecoveryFailed(t *testing.T) {
 	if err := w.Close(); err != nil {
 		t.Errorf("Failed to close wal: %v", err)
 	}
-	recoveredTxns3, w, err := New(wt.path)
+	recoveredTxns3, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -807,7 +825,7 @@ func TestTransactionAppend(t *testing.T) {
 	wt.Close()
 
 	// Restart it and check if exactly 2 unfinished transactions are reported
-	recoveredTxns2, w, err := New(wt.path)
+	recoveredTxns2, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Fatal(err)
 	}
