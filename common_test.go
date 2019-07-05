@@ -39,7 +39,7 @@ func TestCommon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// If the offset wasn't 0 we need to prepend 0 bytes to the expected data.
+	// If the offset wasn't 0 we need to prepend 'offset' bytes to the expected data.
 	data = append(make([]byte, offset), data...)
 	// Make sure the file was created.
 	readData, err := ioutil.ReadFile(path)
