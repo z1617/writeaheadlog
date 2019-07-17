@@ -52,22 +52,24 @@ type (
 		// ensure a clean shutdown
 		wg sync.WaitGroup
 
-		// dependencies are used to inject special behaviour into the wal by providing
+		// dependencies are used to inject special behavior into the wal by providing
 		// custom dependencies when the wal is created and calling deps.disrupt(setting).
 		// The following settings are currently available
-		deps      dependencies
-		logFile   file
-		mu        sync.Mutex
-		path      string // path of the underlying logFile
-		staticLog *persist.Logger
+		deps         dependencies
+		logFile      file
+		printAllLogs bool
+		mu           sync.Mutex
+		path         string // path of the underlying logFile
+		staticLog    *persist.Logger
 	}
 
 	// Options are a helper struct for creating a WAL. This allows for the API of
 	// the writeaheadlog to remain compatible by simply extending the Options
 	// struct with new fields as needed.
 	Options struct {
-		deps   dependencies
-		Logger *persist.Logger
+		deps         dependencies
+		Logger       *persist.Logger
+		printAllLogs bool
 	}
 )
 
@@ -92,9 +94,10 @@ func newWal(path string, options Options) (txns []*Transaction, w *WAL, err erro
 	}
 	// Create a new WAL.
 	newWal := &WAL{
-		deps:      options.deps,
-		path:      path,
-		staticLog: options.Logger,
+		deps:         options.deps,
+		path:         path,
+		staticLog:    options.Logger,
+		printAllLogs: options.printAllLogs,
 	}
 	// sync.go expects the sync state to be initialized with a locked rwMu at
 	// startup.
