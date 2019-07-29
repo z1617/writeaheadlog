@@ -52,24 +52,22 @@ type (
 		// ensure a clean shutdown
 		wg sync.WaitGroup
 
-		// dependencies are used to inject special behavior into the wal by providing
-		// custom dependencies when the wal is created and calling deps.disrupt(setting).
 		// The following settings are currently available
-		deps         dependencies
-		logFile      file
-		printAllLogs bool
-		mu           sync.Mutex
-		path         string // path of the underlying logFile
-		staticLog    *persist.Logger
+		logFile file
+		options Options
+		mu      sync.Mutex
 	}
 
 	// Options are a helper struct for creating a WAL. This allows for the API of
 	// the writeaheadlog to remain compatible by simply extending the Options
 	// struct with new fields as needed.
 	Options struct {
-		deps         dependencies
-		Logger       *persist.Logger
-		printAllLogs bool
+		// dependencies are used to inject special behavior into the wal by providing
+		// custom dependencies when the wal is created and calling deps.disrupt(setting).
+		Deps           dependencies
+		StaticLog      *persist.Logger
+		Path           string // path of the underlying logFile
+		VerboseLogging bool
 	}
 )
 
@@ -84,20 +82,17 @@ func (w *WAL) allocatePages(numPages uint64) {
 }
 
 // newWal initializes and returns a wal.
-func newWal(path string, options Options) (txns []*Transaction, w *WAL, err error) {
+func newWal(options Options) (txns []*Transaction, w *WAL, err error) {
 	// Check for default options.
-	if options.deps == nil {
-		options.deps = &dependencyProduction{}
+	if options.Deps == nil {
+		options.Deps = &dependencyProduction{}
 	}
-	if options.Logger == nil {
-		options.Logger = persist.NewLogger(ioutil.Discard)
+	if options.StaticLog == nil {
+		options.StaticLog = persist.NewLogger(ioutil.Discard)
 	}
 	// Create a new WAL.
 	newWal := &WAL{
-		deps:         options.deps,
-		path:         path,
-		staticLog:    options.Logger,
-		printAllLogs: options.printAllLogs,
+		options: options,
 	}
 	// sync.go expects the sync state to be initialized with a locked rwMu at
 	// startup.
@@ -107,10 +102,10 @@ func newWal(path string, options Options) (txns []*Transaction, w *WAL, err erro
 
 	// Create a condition for the wal
 	// Try opening the WAL file.
-	data, err := newWal.deps.readFile(path)
+	data, err := newWal.options.Deps.readFile(options.Path)
 	if err == nil {
 		// Reuse the existing wal
-		newWal.logFile, err = newWal.deps.openFile(path, os.O_RDWR, 0600)
+		newWal.logFile, err = newWal.options.Deps.openFile(options.Path, os.O_RDWR, 0600)
 		if err != nil {
 			return nil, nil, errors.Extend(errors.New("unable to open wal logFile"), err)
 		}
@@ -130,7 +125,7 @@ func newWal(path string, options Options) (txns []*Transaction, w *WAL, err erro
 	}
 
 	// Create new empty WAL
-	newWal.logFile, err = newWal.deps.create(path)
+	newWal.logFile, err = newWal.options.Deps.create(options.Path)
 	if err != nil {
 		return nil, nil, errors.Extend(err, errors.New("walFile could not be created"))
 	}
@@ -262,9 +257,9 @@ nextTxn:
 			continue
 		}
 		txn.Updates = updates
-		w.staticLog.Println("wal has recovered an unfinished transaction")
+		w.options.StaticLog.Println("wal has recovered an unfinished transaction")
 		for i, u := range updates {
-			w.staticLog.Printf("\tupdate %d: %s", i, u.Name)
+			w.options.StaticLog.Printf("\tupdate %d: %s", i, u.Name)
 		}
 
 		txns = append(txns, txn)
@@ -380,7 +375,7 @@ func (w *WAL) Close() error {
 	}
 
 	// Write the recovery state to indicate clean shutdown if no error occured
-	if err1 == nil && !w.deps.disrupt("UncleanShutdown") {
+	if err1 == nil && !w.options.Deps.disrupt("UncleanShutdown") {
 		err1 = w.writeRecoveryState(recoveryStateClean)
 	}
 
@@ -412,11 +407,13 @@ func (w *WAL) CloseIncomplete() (int64, error) {
 // multiple appearances and them just being loaded a single time correctly.
 func New(path string) ([]*Transaction, *WAL, error) {
 	// Create a wal with default options.
-	return newWal(path, Options{})
+	return newWal(Options{
+		Path: path,
+	})
 }
 
 // NewWithOptions opens a WAL like New but takes an Options struct as an
 // additional argument to customize some of the WAL's behavior like logging.
-func NewWithOptions(path string, opts Options) ([]*Transaction, *WAL, error) {
-	return newWal(path, opts)
+func NewWithOptions(opts Options) ([]*Transaction, *WAL, error) {
+	return newWal(opts)
 }

@@ -19,9 +19,10 @@ func newTestWAL(path string, deps dependencies) ([]*Transaction, *WAL, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return newWal(path, Options{
-		deps:   deps,
-		Logger: log,
+	return newWal(Options{
+		Deps:      deps,
+		StaticLog: log,
+		Path:      path,
 	})
 }
 

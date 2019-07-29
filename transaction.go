@@ -152,7 +152,7 @@ func (t *Transaction) commit() error {
 	// Calculate the checksum
 	checksum := t.checksum()
 
-	if t.wal.deps.disrupt("CommitFail") {
+	if t.wal.options.Deps.disrupt("CommitFail") {
 		return errors.New("Write failed on purpose")
 	}
 
@@ -321,7 +321,7 @@ func (t *Transaction) SignalUpdatesApplied() error {
 	t.status = txnStatusApplied
 
 	// Write the status to disk
-	if t.wal.deps.disrupt("ReleaseFail") {
+	if t.wal.options.Deps.disrupt("ReleaseFail") {
 		return errors.New("Write failed on purpose")
 	}
 
@@ -348,12 +348,12 @@ func (t *Transaction) SignalUpdatesApplied() error {
 	if atomic.AddInt64(&t.wal.atomicUnfinishedTxns, -1) < 0 {
 		panic("Sanity check failed. atomicUnfinishedTxns should never be negative")
 	}
-	if t.wal.printAllLogs {
-		t.wal.staticLog.Debugf("SignalUpdatesApplied on txn with %v updates", len(t.Updates))
+	if t.wal.options.VerboseLogging {
+		t.wal.options.StaticLog.Debugf("SignalUpdatesApplied on txn with %v updates", len(t.Updates))
 		for i, u := range t.Updates {
-			t.wal.staticLog.Debugf("\tupdate %d: %s", i, u.Name)
+			t.wal.options.StaticLog.Debugf("\tupdate %d: %s", i, u.Name)
 		}
-		t.wal.staticLog.Debugf("UnfinishedTxns: %v", atomic.LoadInt64(&t.wal.atomicUnfinishedTxns))
+		t.wal.options.StaticLog.Debugf("UnfinishedTxns: %v", atomic.LoadInt64(&t.wal.atomicUnfinishedTxns))
 	}
 
 	return nil
@@ -528,12 +528,12 @@ func (w *WAL) NewTransaction(updates []Update) (*Transaction, error) {
 
 	// Increase the number of active transaction
 	atomic.AddInt64(&w.atomicUnfinishedTxns, 1)
-	if w.printAllLogs {
-		w.staticLog.Debugf("Creating new txn with %v updates", len(updates))
+	if w.options.VerboseLogging {
+		w.options.StaticLog.Debugf("Creating new txn with %v updates", len(updates))
 		for i, u := range updates {
-			w.staticLog.Debugf("\tupdate %d: %s", i, u.Name)
+			w.options.StaticLog.Debugf("\tupdate %d: %s", i, u.Name)
 		}
-		w.staticLog.Debugf("UnfinishedTxns: %v", atomic.LoadInt64(&w.atomicUnfinishedTxns))
+		w.options.StaticLog.Debugf("UnfinishedTxns: %v", atomic.LoadInt64(&w.atomicUnfinishedTxns))
 	}
 
 	return txn, nil
