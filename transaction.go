@@ -315,6 +315,10 @@ func (t *Transaction) SignalUpdatesApplied() error {
 	if !t.setupComplete || !t.commitComplete || t.releaseComplete {
 		return errors.New("misuse of transaction - call each of the signaling methods exactly once, in serial, in order")
 	}
+	if err := t.wal.tg.Add(); err != nil {
+		return err
+	}
+	defer t.wal.tg.Done()
 	t.releaseComplete = true
 
 	// Set the status to applied
@@ -447,11 +451,16 @@ func (t *Transaction) append(updates []Update) (err error) {
 
 // Append appends additional updates to a transaction
 func (t *Transaction) Append(updates []Update) <-chan error {
+	done := make(chan error, 1)
+	if err := t.wal.tg.Add(); err != nil {
+		done <- err
+		return done
+	}
+	defer t.wal.tg.Done()
 	// Verify the updates
 	for _, u := range updates {
 		u.verify()
 	}
-	done := make(chan error, 1)
 
 	if t.setupComplete || t.commitComplete || t.releaseComplete {
 		done <- errors.New("misuse of transaction - can't append to transaction once it is committed/released")
@@ -469,11 +478,15 @@ func (t *Transaction) Append(updates []Update) <-chan error {
 // applied atomically.
 func (t *Transaction) SignalSetupComplete() <-chan error {
 	done := make(chan error, 1)
-
 	if t.setupComplete || t.commitComplete || t.releaseComplete {
 		done <- errors.New("misuse of transaction - call each of the signaling methods exactly ones, in serial, in order")
 		return done
 	}
+	if err := t.wal.tg.Add(); err != nil {
+		done <- err
+		return done
+	}
+	defer t.wal.tg.Done()
 	t.setupComplete = true
 
 	// Commit the transaction non-blocking
@@ -506,6 +519,10 @@ func (t *Transaction) writePage(page *page) error {
 
 // NewTransaction creates a transaction from a set of updates.
 func (w *WAL) NewTransaction(updates []Update) (*Transaction, error) {
+	if err := w.tg.Add(); err != nil {
+		return nil, err
+	}
+	defer w.tg.Done()
 	// Check that there are updates for the transaction to process.
 	if len(updates) == 0 {
 		return nil, errors.New("cannot create a transaction without updates")

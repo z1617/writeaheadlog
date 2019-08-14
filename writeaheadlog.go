@@ -15,6 +15,7 @@ import (
 	"unsafe"
 
 	"gitlab.com/NebulousLabs/Sia/persist"
+	"gitlab.com/NebulousLabs/threadgroup"
 
 	"gitlab.com/NebulousLabs/errors"
 )
@@ -48,9 +49,9 @@ type (
 		// and the availablePages array is updated to include the extended pages.
 		filePageCount uint64
 
-		// wg is a WaitGroup that allows us to wait for the syncThread to finish to
+		// tg is a ThreadGroup that allows us to wait for the syncThread to finish to
 		// ensure a clean shutdown
-		wg sync.WaitGroup
+		tg threadgroup.ThreadGroup
 
 		// The following settings are currently available
 		logFile file
@@ -380,19 +381,20 @@ func (w *WAL) Close() error {
 	}
 
 	// Make sure sync thread isn't running
-	w.wg.Wait()
+	err2 := w.tg.Stop()
 
 	// Close the logFile
-	err2 := w.logFile.Close()
+	err3 := w.logFile.Close()
 
-	return errors.Compose(err1, err2)
+	return errors.Compose(err1, err2, err3)
 }
 
 // CloseIncomplete closes the WAL and reports the number of transactions that
 // are still uncomitted.
 func (w *WAL) CloseIncomplete() (int64, error) {
-	w.wg.Wait()
-	return atomic.LoadInt64(&w.atomicUnfinishedTxns), w.logFile.Close()
+	err1 := w.tg.Stop()
+	err2 := w.logFile.Close()
+	return atomic.LoadInt64(&w.atomicUnfinishedTxns), errors.Compose(err1, err2)
 }
 
 // New will open a WAL. If the previous run did not shut down cleanly, a set of

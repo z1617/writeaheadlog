@@ -20,7 +20,6 @@ type syncState struct {
 // threadedSync syncs the WAL in regular intervals, exiting if there is no more
 // work to do.
 func (w *WAL) threadedSync() {
-	defer w.wg.Done()
 	for {
 		// Check if there is a syncing job. If there is no syncing job, the
 		// thread can return.
@@ -71,8 +70,13 @@ func (w *WAL) fSync() error {
 	// If the status was previously '0', there is no syncing thread, and a new
 	// one must be spawned.
 	if oldStatus == 0 {
-		w.wg.Add(1)
-		go w.threadedSync()
+		if err := w.tg.Add(); err != nil {
+			return err
+		}
+		go func() {
+			defer w.tg.Done()
+			w.threadedSync()
+		}()
 	}
 
 	// The syncMu will hold a writelock until the fsync is completed. When we
