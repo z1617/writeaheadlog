@@ -2,6 +2,7 @@ deps:
 	go get -u gitlab.com/NebulousLabs/errors
 	go get -u gitlab.com/NebulousLabs/Sia/persist
 	go get -u gitlab.com/NebulousLabs/fastrand
+	go get -u gitlab.com/NebulousLabs/threadgroup
 	go get -u golang.org/x/crypto/blake2b
 	go get -u github.com/alecthomas/gometalinter
 	gometalinter --install
