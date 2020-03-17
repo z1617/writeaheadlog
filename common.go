@@ -41,7 +41,15 @@ func ApplyTruncateUpdate(u Update) error {
 	size := int64(binary.LittleEndian.Uint64(u.Instructions[:8]))
 	path := string(u.Instructions[8:])
 	// Truncate file.
-	return os.Truncate(path, size)
+	f, err := os.OpenFile(path, os.O_RDWR, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if err = f.Truncate(size); err != nil {
+		return err
+	}
+	return f.Sync()
 }
 
 // ApplyWriteAtUpdate parses and applies a writeat update.
