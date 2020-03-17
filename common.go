@@ -45,11 +45,10 @@ func ApplyTruncateUpdate(u Update) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	if err = f.Truncate(size); err != nil {
-		return err
-	}
-	return f.Sync()
+	errTrunc := f.Truncate(size)
+	errSync := f.Sync()
+	errClose := f.Close()
+	return errors.Compose(errTrunc, errSync, errClose)
 }
 
 // ApplyWriteAtUpdate parses and applies a writeat update.
