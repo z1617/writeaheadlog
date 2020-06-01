@@ -64,7 +64,7 @@ func (w *WAL) fSync() error {
 	// Set the sync status to '2' to indicate that there is at least one thread
 	// waiting for a sync. When we do this, we guarantee that an fsync is going
 	// to run following the update. It is possible, due to asynchrony, that the
-	// fsync has already completed and so we are running an unecessary fsync,
+	// fsync has already completed and so we are running an unnecessary fsync,
 	// but that is acceptable and should not impact performance.
 	oldStatus := atomic.SwapUint32(&w.atomicSyncStatus, 2)
 	// If the status was previously '0', there is no syncing thread, and a new

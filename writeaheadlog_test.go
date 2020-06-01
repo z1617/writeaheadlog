@@ -54,7 +54,10 @@ func retry(tries int, durationBetweenAttempts time.Duration, fn func() error) (e
 // directory.
 func tempDir(dirs ...string) string {
 	path := filepath.Join(os.TempDir(), "wal", filepath.Join(dirs...))
-	os.RemoveAll(path) // remove old test data
+	err := os.RemoveAll(path) // remove old test data
+	if err != nil {
+		panic(err)
+	}
 	return path
 }
 
@@ -91,7 +94,7 @@ func newWALTester(name string, deps dependencies) (*walTester, error) {
 
 	for _, txn := range recoveredTxns {
 		if err := txn.SignalUpdatesApplied(); err != nil {
-			wal.Close()
+			_ = wal.Close()
 			return nil, err
 		}
 	}
@@ -142,7 +145,10 @@ func TestCommitFailed(t *testing.T) {
 	}
 
 	// shutdown the wal
-	wt.Close()
+	err = wt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -155,7 +161,12 @@ func TestCommitFailed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if len(updates2) != 0 {
 		t.Errorf("Number of updates after restart didn't match. Expected %v, but was %v",
@@ -236,7 +247,10 @@ func TestReleaseFailed(t *testing.T) {
 	}
 
 	// shutdown the wal
-	wt.Close()
+	err = wt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -249,7 +263,12 @@ func TestReleaseFailed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if len(updates2) != 1 {
 		t.Errorf("Number of updates after restart didn't match. Expected %v, but was %v",
@@ -296,7 +315,10 @@ func TestReleaseNotCalled(t *testing.T) {
 	}
 
 	// shutdown the wal
-	wt.Close()
+	err = wt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -308,7 +330,12 @@ func TestReleaseNotCalled(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if len(updates2) != len(updates) {
 		t.Errorf("Number of updates after restart didn't match. Expected %v, but was %v",
@@ -361,7 +388,7 @@ func TestPayloadCorrupted(t *testing.T) {
 	}
 
 	// shutdown the wal
-	wt.Close()
+	err = wt.Close()
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -373,7 +400,12 @@ func TestPayloadCorrupted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if len(updates2) != 1 {
 		t.Errorf("Number of updates after restart didn't match. Expected %v, but was %v",
@@ -425,7 +457,10 @@ func TestPayloadCorrupted2(t *testing.T) {
 	}
 
 	// shutdown the wal
-	wt.Close()
+	err = wt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -437,7 +472,12 @@ func TestPayloadCorrupted2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if len(updates2) != 1 {
 		t.Errorf("Number of updates after restart didn't match. Expected %v, but was %v",
@@ -501,7 +541,10 @@ func TestWalParallel(t *testing.T) {
 	}
 
 	// shutdown the wal
-	wt.Close()
+	err = wt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Get the fileinfo
 	fi, err := os.Stat(wt.path)
@@ -518,7 +561,12 @@ func TestWalParallel(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	defer w.Close()
+	defer func() {
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if len(updates2) != 0 {
 		t.Errorf("Number of updates after restart didn't match. Expected %v, but was %v",
@@ -827,14 +875,22 @@ func TestTransactionAppend(t *testing.T) {
 	}
 
 	// shutdown the wal
-	wt.Close()
+	err = wt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Restart it and check if exactly 2 unfinished transactions are reported
 	recoveredTxns2, w, err := newProdTestWAL(wt.path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer w.Close()
+	defer func() {
+		err = w.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	if len(recoveredTxns2[0].Updates) != len(updates)*2 {
 		t.Errorf("Number of updates after restart didn't match. Expected %v, but was %v",
@@ -967,7 +1023,6 @@ func benchmarkTransactionSpeed(b *testing.B, numThreads int, appendUpdate bool) 
 	b.Logf("total transactions: %v", atomicNumTxns)
 	b.Logf("txn/s: %v", float64(atomicNumTxns)/60.0)
 	b.Logf("maxLatency: %v", maxLatency)
-
 }
 
 // BenchmarkTransactionSpeedAppend runs benchmarkTransactionSpeed with append =
@@ -1060,7 +1115,7 @@ func benchmarkDiskWrites(b *testing.B, numWrites int, pageSize int, numThreads i
 		go write(i)
 	}
 
-	// Wait for the threads and check if they were successfull
+	// Wait for the threads and check if they were successful.
 	wg.Wait()
 	if atomicCounter > 0 {
 		b.Fatalf("%v errors happened during execution", atomicCounter)

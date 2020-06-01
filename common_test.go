@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"io/ioutil"
 	"os"
+	gopath "path"
 	"path/filepath"
 	"testing"
 
@@ -42,7 +43,7 @@ func TestCommon(t *testing.T) {
 	// If the offset wasn't 0 we need to prepend 'offset' bytes to the expected data.
 	data = append(make([]byte, offset), data...)
 	// Make sure the file was created.
-	readData, err := ioutil.ReadFile(path)
+	readData, err := ioutil.ReadFile(gopath.Clean(path))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +58,7 @@ func TestCommon(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Make sure the file has the right contents.
-	readData, err = ioutil.ReadFile(path)
+	readData, err = ioutil.ReadFile(gopath.Clean(path))
 	if err != nil {
 		t.Fatal(err)
 	}

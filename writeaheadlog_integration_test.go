@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -244,7 +245,7 @@ func (s *silo) threadedUpdate(t *testing.T, w *WAL, dataPath string, wg *sync.Wa
 		appendFrom := length
 		for j := 0; j < length; j++ {
 			if appendFrom == length && j > 0 && fastrand.Intn(500) == 0 {
-				// There is a 0.5% chance that the remaing updates will be
+				// There is a 0.5% chance that the remaining updates will be
 				// appended after the transaction was created
 				appendFrom = j
 			}
@@ -390,7 +391,7 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 	}
 	defer func() {
 		if err != nil {
-			wal.logFile.Close()
+			_ = wal.logFile.Close()
 		}
 	}()
 
@@ -527,7 +528,10 @@ func TestSilo(t *testing.T) {
 	// Create the folder and establish the filepaths.
 	deps := newFaultyDiskDependency(10e6)
 	testdir := tempDir("wal", t.Name())
-	os.MkdirAll(testdir, 0777)
+	err := os.MkdirAll(testdir, 0777)
+	if err != nil {
+		t.Fatal(err)
+	}
 	dbPath := filepath.Join(testdir, "database.dat")
 	walPath := filepath.Join(testdir, "wal.dat")
 
@@ -625,7 +629,7 @@ func TestSilo(t *testing.T) {
 	}
 
 	// Fetch the size of the wal file for the stats reporting.
-	walFile, err := os.Open(walPath)
+	walFile, err := os.Open(path.Clean(walPath))
 	if err != nil {
 		t.Error("Failed to open wal:", err)
 	}

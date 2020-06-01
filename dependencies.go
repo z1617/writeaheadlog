@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
 )
 
 // These interfaces define the wal's dependencies. Using the smallest
@@ -32,8 +33,8 @@ type (
 type dependencyProduction struct{}
 
 func (*dependencyProduction) disrupt(string) bool { return false }
-func (*dependencyProduction) readFile(path string) ([]byte, error) {
-	return ioutil.ReadFile(path)
+func (*dependencyProduction) readFile(filepath string) ([]byte, error) {
+	return ioutil.ReadFile(path.Clean(filepath))
 }
 func (*dependencyProduction) openFile(path string, flag int, perm os.FileMode) (file, error) {
 	return os.OpenFile(path, flag, perm)

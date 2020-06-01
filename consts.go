@@ -33,7 +33,7 @@ const (
 	// txnStatusCommitted indicates that the transaction has been committed,
 	// but not completed. During recovery, transactions with this status
 	// should be loaded and their updates should be provided to the user.
-	txnStatusComitted
+	txnStatusCommitted
 
 	// txnStatusApplied indicates that the transaction has been committed and
 	// applied. Transactions with this status can be ignored during recovery,

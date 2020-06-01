@@ -51,12 +51,12 @@ type Update struct {
 // transactions SignalSetupComplete has to be called which returns a channel
 // that is closed once the transaction is committed. Finally
 // SignalUpdatesApplied needs to be called after the transaction was committed
-// to signal a successfull transaction and free used pages.
+// to signal a successful transaction and free used pages.
 type Transaction struct {
 	// setupComplete, commitComplete, and releaseComplete signal the progress of
 	// the transaction, and should be set to 'true' in order.
 	//
-	// When setupComplete is set to true, it means that the creater of the
+	// When setupComplete is set to true, it means that the creator of the
 	// transaction is ready for the transaction to be committed.
 	//
 	// When commitComplete is set to true, it means that the WAL has
@@ -92,7 +92,7 @@ type Transaction struct {
 	wal *WAL
 	// initComplete is used to signal if initializing the transaction is complete
 	initComplete chan struct{}
-	// initErr stores possible errors that might have occured during
+	// initErr stores possible errors that might have occurred during
 	// initialization
 	initErr error
 }
@@ -144,7 +144,7 @@ func (t *Transaction) commit() error {
 	}
 
 	// Set the transaction status
-	t.status = txnStatusComitted
+	t.status = txnStatusCommitted
 
 	// Set the sequence number and increase the WAL's transactionCounter
 	t.sequenceNumber = atomic.AddUint64(&t.wal.atomicNextTxnNum, 1) - 1

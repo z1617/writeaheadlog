@@ -3,6 +3,7 @@ package writeaheadlog
 import (
 	"io/ioutil"
 	"os"
+	"path"
 	"sync"
 
 	"gitlab.com/NebulousLabs/errors"
@@ -102,8 +103,8 @@ func (d *dependencyFaultyDisk) tryFail() bool {
 func (d *dependencyFaultyDisk) newFaultyFile(f *os.File) *faultyFile {
 	return &faultyFile{d: d, file: f}
 }
-func (*dependencyFaultyDisk) readFile(path string) ([]byte, error) {
-	return ioutil.ReadFile(path)
+func (*dependencyFaultyDisk) readFile(filepath string) ([]byte, error) {
+	return ioutil.ReadFile(path.Clean(filepath))
 }
 func (d *dependencyFaultyDisk) remove(path string) error {
 	d.mu.Lock()

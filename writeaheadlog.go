@@ -117,7 +117,6 @@ func newWal(options Options) (txns []*Transaction, w *WAL, err error) {
 		}
 
 		return txns, newWal, nil
-
 	} else if !os.IsNotExist(err) {
 		// the file exists but couldn't be opened
 		return nil, nil, errors.Extend(err, errors.New("walFile was not opened successfully"))
@@ -158,7 +157,7 @@ func readWALMetadata(data []byte) (uint16, error) {
 	return fileState, nil
 }
 
-// recoverWAL recovers a WAL and returns comitted but not finished updates
+// recoverWAL recovers a WAL and returns committed but not finished updates.
 func (w *WAL) recoverWAL(data []byte) ([]*Transaction, error) {
 	// Validate metadata
 	recoveryState, err := readWALMetadata(data[0:])
@@ -206,7 +205,7 @@ func (w *WAL) recoverWAL(data []byte) ([]*Transaction, error) {
 nextTxn:
 	for i := pageSize; i+pageSize <= len(data); i += pageSize {
 		status := binary.LittleEndian.Uint64(data[i:])
-		if status != txnStatusComitted {
+		if status != txnStatusCommitted {
 			continue
 		}
 		// decode metadata and first page
@@ -373,7 +372,7 @@ func (w *WAL) Close() error {
 		err1 = errors.New("There are still non-released transactions left")
 	}
 
-	// Write the recovery state to indicate clean shutdown if no error occured
+	// Write the recovery state to indicate clean shutdown if no error occurred.
 	if err1 == nil && !w.options.Deps.disrupt("UncleanShutdown") {
 		err1 = w.writeRecoveryState(recoveryStateClean)
 	}
@@ -388,7 +387,7 @@ func (w *WAL) Close() error {
 }
 
 // CloseIncomplete closes the WAL and reports the number of transactions that
-// are still uncomitted.
+// are still uncommitted.
 func (w *WAL) CloseIncomplete() (int64, error) {
 	err1 := w.tg.Stop()
 	err2 := w.logFile.Close()
