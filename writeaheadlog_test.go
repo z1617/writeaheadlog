@@ -16,7 +16,7 @@ import (
 // newTestWAL creates a new WAL with a logger for testing.
 func newTestWAL(path string, deps dependencies) ([]*Transaction, *WAL, error) {
 	options := log.Options{
-		Debug: true,
+		Debug:   true,
 		Release: log.Testing,
 	}
 	log, err := log.NewFileLogger(filepath.Join(filepath.Dir(path), "wal.log"), options)
