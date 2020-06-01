@@ -9,13 +9,17 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/persist"
 	"gitlab.com/NebulousLabs/fastrand"
+	"gitlab.com/NebulousLabs/log"
 )
 
 // newTestWAL creates a new WAL with a logger for testing.
 func newTestWAL(path string, deps dependencies) ([]*Transaction, *WAL, error) {
-	log, err := persist.NewFileLogger(filepath.Join(filepath.Dir(path), "wal.log"))
+	options := log.Options{
+		Debug: true,
+		Release: log.Testing,
+	}
+	log, err := log.NewFileLogger(filepath.Join(filepath.Dir(path), "wal.log"), options)
 	if err != nil {
 		return nil, nil, err
 	}

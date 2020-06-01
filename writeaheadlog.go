@@ -7,17 +7,15 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"unsafe"
 
-	"gitlab.com/NebulousLabs/Sia/persist"
-	"gitlab.com/NebulousLabs/threadgroup"
-
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/log"
+	"gitlab.com/NebulousLabs/threadgroup"
 )
 
 type (
@@ -66,7 +64,7 @@ type (
 		// dependencies are used to inject special behavior into the wal by providing
 		// custom dependencies when the wal is created and calling deps.disrupt(setting).
 		Deps           dependencies
-		StaticLog      *persist.Logger
+		StaticLog      *log.Logger
 		Path           string // path of the underlying logFile
 		VerboseLogging bool
 	}
@@ -77,7 +75,7 @@ func (w *WAL) allocatePages(numPages uint64) {
 	// Starting at index 1 because the first page is reserved for metadata
 	start := w.filePageCount + 1
 	for i := start; i < start+numPages; i++ {
-		w.availablePages = append(w.availablePages, uint64(i)*pageSize)
+		w.availablePages = append(w.availablePages, i*pageSize)
 	}
 	w.filePageCount += numPages
 }
@@ -89,7 +87,7 @@ func newWal(options Options) (txns []*Transaction, w *WAL, err error) {
 		options.Deps = &dependencyProduction{}
 	}
 	if options.StaticLog == nil {
-		options.StaticLog = persist.NewLogger(ioutil.Discard)
+		options.StaticLog = log.DiscardLogger
 	}
 	// Create a new WAL.
 	newWal := &WAL{
