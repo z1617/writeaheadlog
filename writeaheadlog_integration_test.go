@@ -513,17 +513,17 @@ func newSiloDatabase(deps *dependencyFaultyDisk, dbPath, walPath string, dataPat
 
 // TestSilo is an integration test that is supposed to test all the features of
 // the WAL in a single testcase. It uses 120 silos updating 250 times each and
-// has a time limit of 5 minutes (long) or 30 seconds (short).
+// has a time limit of 5 minutes.
 func TestSilo(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+
 	// Declare some vars to configure the loop
 	numSilos := int64(120)
 	numIncrease := 45
 	maxIters := 250
 	endTime := time.Now().Add(5 * time.Minute)
-	// Test should only run 30 seconds in short mode.
-	if testing.Short() {
-		endTime = time.Now().Add(30 * time.Second)
-	}
 
 	// Create the folder and establish the filepaths.
 	deps := newFaultyDiskDependency(10e6)
