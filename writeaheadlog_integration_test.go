@@ -245,7 +245,7 @@ func (s *silo) threadedUpdate(t *testing.T, w *WAL, dataPath string, wg *sync.Wa
 		appendFrom := length
 		for j := 0; j < length; j++ {
 			if appendFrom == length && j > 0 && fastrand.Intn(500) == 0 {
-				// There is a 0.5% chance that the remaining updates will be
+				// There is a 0.2% chance that the remaining updates will be
 				// appended after the transaction was created
 				appendFrom = j
 			}
