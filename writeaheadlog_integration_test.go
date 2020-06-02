@@ -391,7 +391,7 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 	}
 	defer func() {
 		if err != nil {
-			_ = wal.logFile.Close()
+			err = wal.logFile.Close()
 		}
 	}()
 

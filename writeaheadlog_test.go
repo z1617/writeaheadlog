@@ -71,10 +71,18 @@ type walTester struct {
 	path          string
 }
 
-// Close is a helper function for a clean tester shutdown
+// Close is a helper function for a clean tester shutdown.
 func (wt *walTester) Close() error {
 	// Close wal
 	return wt.wal.Close()
+}
+
+// CloseIncomplete is a helper function for a clean tester shutdown in the case
+// of incomplete transactions.
+func (wt *walTester) CloseIncomplete() error {
+	// Close wal
+	_, err := wt.wal.CloseIncomplete()
+	return err
 }
 
 // newWalTester returns a ready-to-rock walTester.
@@ -94,7 +102,7 @@ func newWALTester(name string, deps dependencies) (*walTester, error) {
 
 	for _, txn := range recoveredTxns {
 		if err := txn.SignalUpdatesApplied(); err != nil {
-			_ = wal.Close()
+			_, err = wal.CloseIncomplete()
 			return nil, err
 		}
 	}
@@ -145,7 +153,10 @@ func TestCommitFailed(t *testing.T) {
 	}
 
 	// shutdown the wal
-	_ = wt.Close()
+	err = wt.CloseIncomplete()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -159,7 +170,10 @@ func TestCommitFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = w.Close()
+		_, err = w.CloseIncomplete()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	if len(updates2) != 0 {
@@ -241,7 +255,10 @@ func TestReleaseFailed(t *testing.T) {
 	}
 
 	// shutdown the wal
-	_ = wt.Close()
+	err = wt.CloseIncomplete()
+	if err != nil {
+		t.Error(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -255,7 +272,10 @@ func TestReleaseFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = w.Close()
+		_, err = w.CloseIncomplete()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	if len(updates2) != 1 {
@@ -303,7 +323,10 @@ func TestReleaseNotCalled(t *testing.T) {
 	}
 
 	// shutdown the wal
-	_ = wt.Close()
+	err = wt.CloseIncomplete()
+	if err != nil {
+		t.Error(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -316,7 +339,10 @@ func TestReleaseNotCalled(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = w.Close()
+		_, err = w.CloseIncomplete()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	if len(updates2) != len(updates) {
@@ -370,7 +396,10 @@ func TestPayloadCorrupted(t *testing.T) {
 	}
 
 	// shutdown the wal
-	_ = wt.Close()
+	err = wt.CloseIncomplete()
+	if err != nil {
+		t.Error(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -383,7 +412,10 @@ func TestPayloadCorrupted(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = w.Close()
+		_, err = w.CloseIncomplete()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	if len(updates2) != 1 {
@@ -436,7 +468,10 @@ func TestPayloadCorrupted2(t *testing.T) {
 	}
 
 	// shutdown the wal
-	_ = wt.Close()
+	err = wt.CloseIncomplete()
+	if err != nil {
+		t.Error(err)
+	}
 
 	// make sure the wal is still there
 	if _, err := os.Stat(wt.path); os.IsNotExist(err) {
@@ -449,7 +484,10 @@ func TestPayloadCorrupted2(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = w.Close()
+		_, err = w.CloseIncomplete()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	if len(updates2) != 1 {
@@ -514,7 +552,10 @@ func TestWalParallel(t *testing.T) {
 	}
 
 	// shutdown the wal
-	_ = wt.Close()
+	err = wt.CloseIncomplete()
+	if err != nil {
+		t.Error(err)
+	}
 
 	// Get the fileinfo
 	fi, err := os.Stat(wt.path)
@@ -532,7 +573,10 @@ func TestWalParallel(t *testing.T) {
 		t.Error(err)
 	}
 	defer func() {
-		_ = w.Close()
+		_, err = w.CloseIncomplete()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	if len(updates2) != 0 {
@@ -842,7 +886,10 @@ func TestTransactionAppend(t *testing.T) {
 	}
 
 	// shutdown the wal
-	_ = wt.Close()
+	err = wt.CloseIncomplete()
+	if err != nil {
+		t.Error(err)
+	}
 
 	// Restart it and check if exactly 2 unfinished transactions are reported
 	recoveredTxns2, w, err := newProdTestWAL(wt.path)
@@ -850,7 +897,10 @@ func TestTransactionAppend(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() {
-		_ = w.Close()
+		_, err = w.CloseIncomplete()
+		if err != nil {
+			t.Error(err)
+		}
 	}()
 
 	if len(recoveredTxns2[0].Updates) != len(updates)*2 {
