@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"sync"
@@ -101,7 +102,7 @@ func newWal(options Options) (txns []*Transaction, w *WAL, err error) {
 
 	// Create a condition for the wal
 	// Try opening the WAL file.
-	data, err := newWal.options.Deps.readFile(options.Path)
+	_, err = os.Stat(options.Path)
 	if err == nil {
 		// Reuse the existing wal
 		newWal.logFile, err = newWal.options.Deps.openFile(options.Path, os.O_RDWR, 0600)
@@ -110,7 +111,7 @@ func newWal(options Options) (txns []*Transaction, w *WAL, err error) {
 		}
 
 		// Recover WAL and return updates
-		txns, err = newWal.recoverWAL(data)
+		txns, err = newWal.recoverWAL()
 		if err != nil {
 			err = errors.Compose(err, newWal.logFile.Close())
 			return nil, nil, errors.Extend(err, errors.New("unable to perform wal recovery"))
@@ -136,12 +137,12 @@ func newWal(options Options) (txns []*Transaction, w *WAL, err error) {
 
 // readWALMetadata reads WAL metadata from the input file, returning an error
 // if the result is unexpected.
-func readWALMetadata(data []byte) (uint16, error) {
-	// The metadata should at least long enough to contain all the fields.
-	if len(data) < len(metadataHeader)+len(metadataVersion)+metadataStatusSize {
-		return 0, errors.New("unable to read wal metadata")
+func readWALMetadata(r io.ReaderAt) (uint16, error) {
+	// Read the data.
+	data := make([]byte, len(metadataHeader)+len(metadataVersion)+metadataStatusSize)
+	if _, err := r.ReadAt(data, 0); err != nil {
+		return 0, errors.AddContext(err, "unable to read wal metadata")
 	}
-
 	// Check that the header and version match.
 	if !bytes.Equal(data[:len(metadataHeader)], metadataHeader[:]) {
 		return 0, errors.New("file header is incorrect")
@@ -158,9 +159,9 @@ func readWALMetadata(data []byte) (uint16, error) {
 }
 
 // recoverWAL recovers a WAL and returns committed but not finished updates.
-func (w *WAL) recoverWAL(data []byte) ([]*Transaction, error) {
+func (w *WAL) recoverWAL() ([]*Transaction, error) {
 	// Validate metadata
-	recoveryState, err := readWALMetadata(data[0:])
+	recoveryState, err := readWALMetadata(w.logFile)
 	if err != nil {
 		return nil, errors.Extend(err, errors.New("unable to read wal metadata"))
 	}
@@ -172,22 +173,40 @@ func (w *WAL) recoverWAL(data []byte) ([]*Transaction, error) {
 		return nil, nil
 	}
 
+	// Get size of file
+	fi, err := w.logFile.Stat()
+	if err != nil {
+		return nil, errors.AddContext(err, "failed to get size of wal")
+	}
+
 	// load all normal pages
 	type diskPage struct {
 		page
 		nextPageOffset uint64
 	}
 	pageSet := make(map[uint64]*diskPage) // keyed by offset
-	for i := uint64(pageSize); i+pageSize <= uint64(len(data)); i += pageSize {
-		nextOffset := binary.LittleEndian.Uint64(data[i:])
+	buf64bit := make([]byte, 8)
+	for i := int64(pageSize); i+pageSize <= fi.Size(); i += pageSize {
+		// read next offset
+		if _, err := w.logFile.ReadAt(buf64bit, i); err != nil {
+			return nil, errors.AddContext(err, "failed to read next offset")
+		}
+		nextOffset := binary.LittleEndian.Uint64(buf64bit)
 		if nextOffset < pageSize {
 			// nextOffset is actually a transaction status
 			continue
 		}
-		pageSet[i] = &diskPage{
+
+		// read payload
+		payload := make([]byte, pageSize-pageMetaSize)
+		if _, err := w.logFile.ReadAt(payload, i+pageMetaSize); err != nil {
+			return nil, errors.AddContext(err, "failed to read payload")
+		}
+
+		pageSet[uint64(i)] = &diskPage{
 			page: page{
-				offset:  i,
-				payload: data[i+pageMetaSize : i+pageSize],
+				offset:  uint64(i),
+				payload: payload,
 			},
 			nextPageOffset: nextOffset,
 		}
@@ -203,19 +222,40 @@ func (w *WAL) recoverWAL(data []byte) ([]*Transaction, error) {
 	// reconstruct transactions
 	var txns []*Transaction
 nextTxn:
-	for i := pageSize; i+pageSize <= len(data); i += pageSize {
-		status := binary.LittleEndian.Uint64(data[i:])
+	for i := int64(pageSize); i+pageSize <= fi.Size(); i += pageSize {
+		// read status
+		if _, err := w.logFile.ReadAt(buf64bit, i); err != nil {
+			return nil, errors.AddContext(err, "failed to read status")
+		}
+		status := binary.LittleEndian.Uint64(buf64bit)
 		if status != txnStatusCommitted {
 			continue
 		}
 		// decode metadata and first page
-		seq := binary.LittleEndian.Uint64(data[i+8:])
+		// read seq
+		if _, err := w.logFile.ReadAt(buf64bit, i+8); err != nil {
+			return nil, errors.AddContext(err, "failed to read seq")
+		}
+		seq := binary.LittleEndian.Uint64(buf64bit)
+		// read checksum
 		var diskChecksum checksum
-		n := copy(diskChecksum[:], data[i+16:])
-		nextPageOffset := binary.LittleEndian.Uint64(data[i+16+n:])
+		if _, err := w.logFile.ReadAt(diskChecksum[:], i+16); err != nil {
+			return nil, errors.AddContext(err, "failed to read checksum")
+		}
+		// read next page offset
+		if _, err := w.logFile.ReadAt(buf64bit, i+16+checksumSize); err != nil {
+			return nil, errors.AddContext(err, "failed to read next page offset")
+		}
+		nextPageOffset := binary.LittleEndian.Uint64(buf64bit)
+		// read payload
+		payload := make([]byte, pageSize-firstPageMetaSize)
+		if _, err := w.logFile.ReadAt(payload, i+firstPageMetaSize); err != nil {
+			return nil, errors.AddContext(err, "failed to read payload")
+		}
+		// construct page
 		firstPage := &page{
 			offset:  uint64(i),
-			payload: data[i+firstPageMetaSize : i+pageSize],
+			payload: payload,
 		}
 		if nextDiskPage, ok := pageSet[nextPageOffset]; ok {
 			firstPage.nextPage = &nextDiskPage.page
@@ -269,8 +309,8 @@ nextTxn:
 	})
 
 	// filePageCount is the number of pages minus 1 metadata page
-	w.filePageCount = uint64(len(data)) / pageSize
-	if len(data)%pageSize != 0 {
+	w.filePageCount = uint64(fi.Size()) / pageSize
+	if fi.Size()%pageSize != 0 {
 		w.filePageCount++
 	}
 	if w.filePageCount > 0 {

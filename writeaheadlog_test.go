@@ -1,6 +1,7 @@
 package writeaheadlog
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -837,7 +838,7 @@ func TestRecoveryFailed(t *testing.T) {
 	if _, err := w.logFile.ReadAt(mdData, 0); err != nil {
 		t.Fatal(err)
 	}
-	recoveryState, err := readWALMetadata(mdData)
+	recoveryState, err := readWALMetadata(bytes.NewReader(mdData))
 	if err != nil {
 		t.Fatal(err)
 	}
