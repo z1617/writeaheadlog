@@ -107,30 +107,30 @@ func newWal(options Options) (txns []*Transaction, w *WAL, err error) {
 		// Reuse the existing wal
 		newWal.logFile, err = newWal.options.Deps.openFile(options.Path, os.O_RDWR, 0600)
 		if err != nil {
-			return nil, nil, errors.Extend(errors.New("unable to open wal logFile"), err)
+			return nil, nil, errors.Compose(errors.New("unable to open wal logFile"), err)
 		}
 
 		// Recover WAL and return updates
 		txns, err = newWal.recoverWAL()
 		if err != nil {
 			err = errors.Compose(err, newWal.logFile.Close())
-			return nil, nil, errors.Extend(err, errors.New("unable to perform wal recovery"))
+			return nil, nil, errors.Compose(err, errors.New("unable to perform wal recovery"))
 		}
 
 		return txns, newWal, nil
 	} else if !os.IsNotExist(err) {
 		// the file exists but couldn't be opened
-		return nil, nil, errors.Extend(err, errors.New("walFile was not opened successfully"))
+		return nil, nil, errors.Compose(err, errors.New("walFile was not opened successfully"))
 	}
 
 	// Create new empty WAL
 	newWal.logFile, err = newWal.options.Deps.create(options.Path)
 	if err != nil {
-		return nil, nil, errors.Extend(err, errors.New("walFile could not be created"))
+		return nil, nil, errors.Compose(err, errors.New("walFile could not be created"))
 	}
 	// Write the metadata to the WAL
 	if err = writeWALMetadata(newWal.logFile); err != nil {
-		return nil, nil, errors.Extend(err, errors.New("Failed to write metadata to file"))
+		return nil, nil, errors.Compose(err, errors.New("Failed to write metadata to file"))
 	}
 	return nil, newWal, nil
 }
@@ -163,12 +163,12 @@ func (w *WAL) recoverWAL() ([]*Transaction, error) {
 	// Validate metadata
 	recoveryState, err := readWALMetadata(w.logFile)
 	if err != nil {
-		return nil, errors.Extend(err, errors.New("unable to read wal metadata"))
+		return nil, errors.Compose(err, errors.New("unable to read wal metadata"))
 	}
 
 	if recoveryState == recoveryStateClean {
 		if err := w.writeRecoveryState(recoveryStateUnclean); err != nil {
-			return nil, errors.Extend(err, errors.New("unable to write WAL recovery state"))
+			return nil, errors.Compose(err, errors.New("unable to write WAL recovery state"))
 		}
 		return nil, nil
 	}

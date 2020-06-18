@@ -387,11 +387,11 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 	// Reload wal.
 	recoveredTxns, wal, err := newTestWAL(walPath, deps)
 	if err != nil {
-		return 0, errors.Extend(errors.New("failed to reload WAL"), err)
+		return 0, errors.Compose(errors.New("failed to reload WAL"), err)
 	}
 	defer func() {
 		if err != nil {
-			err = wal.logFile.Close()
+			err = errors.Compose(err, wal.logFile.Close())
 		}
 	}()
 
@@ -405,7 +405,7 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 			su.unmarshal(update.Instructions)
 			silos[su.silo].skip = skipTxn
 			if err := su.applyUpdate(silos[su.silo], testdir); err != nil {
-				return 0, errors.Extend(errors.New("Failed to apply update"), err)
+				return 0, errors.Compose(errors.New("Failed to apply update"), err)
 			}
 		}
 		if !skipTxn {
@@ -415,7 +415,7 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 
 	// Sync the applied updates
 	if err := file.Sync(); err != nil {
-		return 0, errors.Extend(errors.New("Failed to sync database"), err)
+		return 0, errors.Compose(errors.New("Failed to sync database"), err)
 	}
 
 	// Check numbers and checksums
@@ -431,10 +431,10 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 
 		// Read numbers and checksum
 		if _, err := silo.f.ReadAt(numbers, silo.offset); err != nil {
-			return 0, errors.Extend(errors.New("Failed to read numbers of silo"), err)
+			return 0, errors.Compose(errors.New("Failed to read numbers of silo"), err)
 		}
 		if _, err := silo.f.ReadAt(cs[:], silo.offset+int64(4*len(silo.numbers))); err != nil {
-			return 0, errors.Extend(errors.New("Failed to read checksum of silo"), err)
+			return 0, errors.Compose(errors.New("Failed to read checksum of silo"), err)
 		}
 
 		// Check numbers for corruption
@@ -455,14 +455,14 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 
 	for _, txn := range appliedTxns {
 		if err := txn.SignalUpdatesApplied(); err != nil {
-			return 0, errors.Extend(errors.New("Failed to signal applied updates"), err)
+			return 0, errors.Compose(errors.New("Failed to signal applied updates"), err)
 		}
 	}
 
 	// Close the wal
 	var openTxns int64
 	if openTxns, err = wal.CloseIncomplete(); err != nil {
-		return 0, errors.Extend(errors.New("Failed to close WAL"), err)
+		return 0, errors.Compose(errors.New("Failed to close WAL"), err)
 	}
 
 	// Sanity check open transactions
@@ -502,7 +502,7 @@ func newSiloDatabase(deps *dependencyFaultyDisk, dbPath, walPath string, dataPat
 	for i := 0; int64(i) < numSilos; i++ {
 		silo, err := newSilo(siloOffset, 1+i*numIncrease, deps, file, dataPath)
 		if err != nil {
-			return nil, nil, nil, errors.Extend(errors.New("failed to init silo"), err)
+			return nil, nil, nil, errors.Compose(errors.New("failed to init silo"), err)
 		}
 		siloOffsets = append(siloOffsets, siloOffset)
 		silos[siloOffset] = silo
@@ -577,7 +577,7 @@ func TestSilo(t *testing.T) {
 			var recoveredTxns []*Transaction
 			recoveredTxns, wal, err = newTestWAL(walPath, deps)
 			if int64(len(recoveredTxns)) != numSkipped || err != nil {
-				t.Fatal(recoveredTxns, err)
+				t.Fatal(len(recoveredTxns), numSkipped, err)
 			}
 		}
 		deps.enable()
@@ -605,7 +605,7 @@ func TestSilo(t *testing.T) {
 			if retries >= 100 {
 				// Could be getting unlucky - try to disable the faulty disk and
 				// see if we can recover all the way.
-				t.Log("Disabling dependencies during recovery - recovery filed 100 times in a row")
+				t.Log("Disabling dependencies during recovery - recovery failed 100 times in a row")
 				deps.disable()
 				defer deps.enable()
 			}
