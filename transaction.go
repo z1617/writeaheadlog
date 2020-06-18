@@ -166,11 +166,11 @@ func (t *Transaction) commit() error {
 	_, err := t.wal.logFile.WriteAt(buf[:16+checksumSize], int64(t.firstPage.offset))
 	bufPool.Put(buf)
 	if err != nil {
-		return errors.Compose(err, errors.New("Writing the first page failed"))
+		return errors.AddContext(err, "Writing the first page failed")
 	}
 
 	if err := t.wal.fSync(); err != nil {
-		return errors.Compose(err, errors.New("Writing the first page failed"))
+		return errors.AddContext(err, "Writing the first page failed")
 	}
 
 	t.commitComplete = true
@@ -298,13 +298,13 @@ func threadedInitTransaction(t *Transaction) {
 	binary.LittleEndian.PutUint64(buf[n+16:], t.firstPage.nextOffset())
 	copy(buf[n+24:], t.firstPage.payload)
 	if _, err := t.wal.logFile.WriteAt(buf, int64(t.firstPage.offset)); err != nil {
-		t.initErr = errors.Compose(err, errors.New("Writing the first page to disk failed"))
+		t.initErr = errors.AddContext(err, "Writing the first page to disk failed")
 		return
 	}
 	// write subsequent pages
 	for page := t.firstPage.nextPage; page != nil; page = page.nextPage {
 		if err := t.writePage(page); err != nil {
-			t.initErr = errors.Compose(err, errors.New("Writing the page to disk failed"))
+			t.initErr = errors.AddContext(err, "Writing the page to disk failed")
 			return
 		}
 	}
@@ -334,10 +334,10 @@ func (t *Transaction) SignalUpdatesApplied() error {
 	_, err := t.wal.logFile.WriteAt(buf[:8], int64(t.firstPage.offset))
 	bufPool.Put(buf)
 	if err != nil {
-		return errors.Compose(err, errors.New("Couldn't write the page to file"))
+		return errors.AddContext(err, "Couldn't write the page to file")
 	}
 	if err := t.wal.fSync(); err != nil {
-		return errors.Compose(err, errors.New("Couldn't write the page to file"))
+		return errors.AddContext(err, "Couldn't write the page to file")
 	}
 
 	// Update the wal's available pages
@@ -396,7 +396,7 @@ func (t *Transaction) append(updates []Update) (err error) {
 
 			// Write last page
 			err = t.writePage(lastPage)
-			err = errors.Compose(err, errors.Compose(err, errors.New("Writing the last page to disk failed")))
+			err = errors.AddContext(err, "Writing the last page to disk failed")
 		}
 	}()
 
@@ -421,7 +421,7 @@ func (t *Transaction) append(updates []Update) (err error) {
 	// pages. Write the new last page to disk and append the new updates.
 	if len(data) == 0 {
 		if err := t.writePage(lastPage); err != nil {
-			return errors.Compose(err, errors.New("Writing the last page to disk failed"))
+			return errors.AddContext(err, "Writing the last page to disk failed")
 		}
 		t.Updates = append(t.Updates, updates...)
 		return nil
@@ -435,13 +435,13 @@ func (t *Transaction) append(updates []Update) (err error) {
 	// old tail page remains valid.
 	for page := lastPage.nextPage; page != nil; page = page.nextPage {
 		if err := t.writePage(page); err != nil {
-			return errors.Compose(err, errors.New("Writing the page to disk failed"))
+			return errors.AddContext(err, "Writing the page to disk failed")
 		}
 	}
 
 	// write last page
 	if err := t.writePage(lastPage); err != nil {
-		return errors.Compose(err, errors.New("Writing the last page to disk failed"))
+		return errors.AddContext(err, "Writing the last page to disk failed")
 	}
 
 	// Append the updates to the transaction

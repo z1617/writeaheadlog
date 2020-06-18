@@ -387,7 +387,7 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 	// Reload wal.
 	recoveredTxns, wal, err := newTestWAL(walPath, deps)
 	if err != nil {
-		return 0, errors.Compose(errors.New("failed to reload WAL"), err)
+		return 0, errors.AddContext(err, "failed to reload WAL")
 	}
 	defer func() {
 		if err != nil {
@@ -405,7 +405,7 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 			su.unmarshal(update.Instructions)
 			silos[su.silo].skip = skipTxn
 			if err := su.applyUpdate(silos[su.silo], testdir); err != nil {
-				return 0, errors.Compose(errors.New("Failed to apply update"), err)
+				return 0, errors.AddContext(err, "Failed to apply update")
 			}
 		}
 		if !skipTxn {
@@ -415,7 +415,7 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 
 	// Sync the applied updates
 	if err := file.Sync(); err != nil {
-		return 0, errors.Compose(errors.New("Failed to sync database"), err)
+		return 0, errors.AddContext(err, "Failed to sync database")
 	}
 
 	// Check numbers and checksums
@@ -431,10 +431,10 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 
 		// Read numbers and checksum
 		if _, err := silo.f.ReadAt(numbers, silo.offset); err != nil {
-			return 0, errors.Compose(errors.New("Failed to read numbers of silo"), err)
+			return 0, errors.AddContext(err, "Failed to read numbers of silo")
 		}
 		if _, err := silo.f.ReadAt(cs[:], silo.offset+int64(4*len(silo.numbers))); err != nil {
-			return 0, errors.Compose(errors.New("Failed to read checksum of silo"), err)
+			return 0, errors.AddContext(err, "Failed to read checksum of silo")
 		}
 
 		// Check numbers for corruption
@@ -455,14 +455,14 @@ func recoverSiloWAL(walPath string, deps *dependencyFaultyDisk, silos map[int64]
 
 	for _, txn := range appliedTxns {
 		if err := txn.SignalUpdatesApplied(); err != nil {
-			return 0, errors.Compose(errors.New("Failed to signal applied updates"), err)
+			return 0, errors.AddContext(err, "Failed to signal applied updates")
 		}
 	}
 
 	// Close the wal
 	var openTxns int64
 	if openTxns, err = wal.CloseIncomplete(); err != nil {
-		return 0, errors.Compose(errors.New("Failed to close WAL"), err)
+		return 0, errors.AddContext(err, "Failed to close WAL")
 	}
 
 	// Sanity check open transactions
@@ -502,7 +502,7 @@ func newSiloDatabase(deps *dependencyFaultyDisk, dbPath, walPath string, dataPat
 	for i := 0; int64(i) < numSilos; i++ {
 		silo, err := newSilo(siloOffset, 1+i*numIncrease, deps, file, dataPath)
 		if err != nil {
-			return nil, nil, nil, errors.Compose(errors.New("failed to init silo"), err)
+			return nil, nil, nil, errors.AddContext(err, "failed to init silo")
 		}
 		siloOffsets = append(siloOffsets, siloOffset)
 		silos[siloOffset] = silo
