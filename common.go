@@ -151,13 +151,15 @@ func (w *WAL) CreateAndApplyTransaction(applyFunc func(...Update) error, updates
 	if err := <-txn.SignalSetupComplete(); err != nil {
 		return errors.AddContext(err, "failed to signal setup completion")
 	}
-	// Apply the updates.
+	// Starting at this point the changes to be made are written to the WAL.
+	// This means we need to panic in case applying the updates fails or if
+	// signaling that they were applied fails.
 	if err := applyFunc(updates...); err != nil {
-		return errors.AddContext(err, "failed to apply updates")
+		panic(errors.AddContext(err, "failed to apply updates"))
 	}
 	// Updates are applied. Let the writeaheadlog know.
 	if err := txn.SignalUpdatesApplied(); err != nil {
-		return errors.AddContext(err, "failed to signal that updates are applied")
+		panic(errors.AddContext(err, "failed to signal that updates are applied"))
 	}
 	return nil
 }
