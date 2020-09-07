@@ -141,6 +141,9 @@ func WriteAtUpdate(path string, index int64, data []byte) Update {
 
 // CreateAndApplyTransaction is a helper method which creates a transaction from
 // a given set of updates and uses the supplied updateFunc to apply it.
+// NOTE: Any error that occurs after writing the update that is about to be made
+// to the WAL will cause this method to panic. This includes any error returned
+// by `applyFunc`. This behavior is a safeguard against corruption.
 func (w *WAL) CreateAndApplyTransaction(applyFunc func(...Update) error, updates ...Update) error {
 	// Create the transaction.
 	txn, err := w.NewTransaction(updates)
